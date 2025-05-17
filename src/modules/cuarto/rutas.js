@@ -7,7 +7,7 @@ const pool = require('../../database');
 router.get('/', async (req, res) => { // Eliminado verifyToken
     try {
         const connection = await pool.getConnection();
-            const [cuartos] = await connection.query(`
+        const [cuartos] = await connection.query(`
             SELECT c.cuarto_id, c.propiedad_id, c.tipo_cuarto_id, c.precio, c.nombre, c.dimensiones, c.n_piso, c.n_cuarto, c.descripcion, c.disponibilidad, c.informacion_adicional, tc.tipo as tipo_cuarto, p.direccion as direccion_propiedad, pr.periodo, u.nombre as nombre_usuario, u.apellido_pa as apellido_usuario
             FROM Cuarto c
             LEFT JOIN Tipo_Cuarto tc ON c.tipo_cuarto_id = tc.tipo_cuarto_id
@@ -120,6 +120,76 @@ router.get('/propiedad/:propiedadId', verifyToken, async (req, res) => {
         res.json({ cuartos });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener cuartos de la propiedad', error: error.message });
+    }
+});
+
+// Comparar cuartos por IDs
+router.get('/compare', async (req, res) => {
+    try {
+        const ids = req.query.ids; // Ejemplo: "1,9"
+        if (!ids) {
+            return res.status(400).json({ message: 'Se requieren los IDs de los cuartos' });
+        }
+        const idsArray = ids.split(',').map(id => parseInt(id));
+        const connection = await pool.getConnection();
+        const [cuartos] = await connection.query(
+            `SELECT 
+                c.cuarto_id,
+                c.propiedad_id,
+                c.tipo_cuarto_id,
+                c.precio,
+                c.nombre,
+                c.dimensiones,
+                c.n_piso,
+                c.n_cuarto,
+                c.descripcion,
+                c.disponibilidad,
+                c.informacion_adicional,
+                tc.tipo as tipo_cuarto,
+                p.direccion as direccion_propiedad,
+                pr.periodo,
+                u.nombre as nombre_usuario,
+                u.apellido_pa as apellido_usuario,
+                MIN(f.url_imagen) as imagen
+            FROM Cuarto c
+            LEFT JOIN Tipo_Cuarto tc ON c.tipo_cuarto_id = tc.tipo_cuarto_id
+            LEFT JOIN Propiedad p ON c.propiedad_id = p.propiedad_id
+            LEFT JOIN Periodo pr ON p.periodo_id = pr.periodo_id
+            LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
+            LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
+            LEFT JOIN Foto f ON c.cuarto_id = f.cuarto_id
+            WHERE c.cuarto_id IN (?)
+            GROUP BY c.cuarto_id
+            `,
+            [idsArray]
+        );
+        connection.release();
+
+        const cuartosConPartner = cuartos.map(cuarto => ({
+            cuarto_id: cuarto.cuarto_id,
+            propiedad_id: cuarto.propiedad_id,
+            tipo_cuarto_id: cuarto.tipo_cuarto_id,
+            precio: cuarto.precio,
+            nombre: cuarto.nombre,
+            dimensiones: cuarto.dimensiones,
+            n_piso: cuarto.n_piso,
+            n_cuarto: cuarto.n_cuarto,
+            descripcion: cuarto.descripcion,
+            disponibilidad: cuarto.disponibilidad,
+            informacion_adicional: cuarto.informacion_adicional,
+            tipo_cuarto: cuarto.tipo_cuarto,
+            direccion_propiedad: cuarto.direccion_propiedad,
+            periodo: cuarto.periodo,
+            partner: {
+                nombre: cuarto.nombre_usuario,
+                apellido: cuarto.apellido_usuario
+            },
+            imagen: cuarto.imagen
+        }));
+
+        res.json({ cuartos: cuartosConPartner });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al comparar cuartos', error: error.message });
     }
 });
 
