@@ -22,4 +22,23 @@ router.get('/usuario/:usuarioId', verifyToken, async (req, res) => {
     }
 });
 
+// Agregar un favorito
+router.post('/', verifyToken, async (req, res) => {
+    try {
+        const { usuario_id, cuarto_id } = req.body;
+        const connection = await pool.getConnection();
+
+        // Inserta el favorito en la base de datos
+        await connection.query(
+            'INSERT INTO Favorito (usuario_id, cuarto_id) VALUES (?, ?)',
+            [usuario_id, cuarto_id]
+        );
+
+        connection.release();
+        res.status(201).json({ message: 'Favorito agregado exitosamente' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al agregar favorito', error: error.message });
+    }
+});
+
 module.exports = router;

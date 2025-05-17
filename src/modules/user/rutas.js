@@ -153,4 +153,49 @@ router.get('/perfil', verifyToken, async (req, res) => {
     }
 });
 
+// Ruta para actualizar el rol de un usuario
+router.put('/update-role/:usuarioId', verifyToken, async (req, res) => {
+    try {
+        const { rol_id } = req.body;
+        const { usuarioId } = req.params;
+
+        const connection = await pool.getConnection();
+
+        // Verificar si el usuario que realiza la solicitud es administrador
+        const [adminUser] = await connection.query('SELECT rol_id FROM Usuario WHERE usuario_id = ?', [req.user.id]);
+        if (adminUser.length === 0 || adminUser[0].rol_id !== 3) { // 3 es el rol de Administrador
+            connection.release();
+            return res.status(403).json({ message: 'Acceso denegado: solo los administradores pueden cambiar roles' });
+        }
+
+        // Verificar si el usuario existe
+        const [existingUser] = await connection.query('SELECT * FROM Usuario WHERE usuario_id = ?', [usuarioId]);
+        if (existingUser.length === 0) {
+            connection.release();
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        // Actualizar rol
+        await connection.query('UPDATE Usuario SET rol_id = ? WHERE usuario_id = ?', [rol_id, usuarioId]);
+
+        // Si el rol es Partner, verifica si ya existe un registro en Partner
+        if (rol_id === 2) { // 2 es el rol de Partner
+            const [existingPartner] = await connection.query('SELECT * FROM Partner WHERE partner_id = ?', [usuarioId]);
+            if (existingPartner.length === 0) {
+                // Insertar nuevo registro en Partner
+                await connection.query('INSERT INTO Partner (partner_id) VALUES (?)', [usuarioId]);
+            }
+        } else {
+            // Si el rol no es Partner, eliminar el registro de Partner si existe
+            await connection.query('DELETE FROM Partner WHERE partner_id = ?', [usuarioId]);
+        }
+
+        connection.release();
+
+        res.json({ message: 'Rol actualizado exitosamente' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al actualizar rol', error: error.message });
+    }
+});
+
 module.exports = router;
