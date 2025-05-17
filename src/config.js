@@ -7,7 +7,7 @@ module.exports = {
         expiresIn: '24h'
     },
     db: {
-        host: process.env.DB_HOST || 'ustay-backend.up.railway.app',
+        host: process.env.DB_HOST || 'localhost',
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || 'qwe123.$',
         database: process.env.DB_NAME || 'backend-ustay',

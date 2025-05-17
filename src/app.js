@@ -44,5 +44,8 @@ app.use((err, req, res, next) => {
         error: process.env.NODE_ENV === 'development' ? err.message : {}
     });
 });
+app.get('/', (req, res) => {
+    res.send('Servidor backend funcionando correctamente');
+  });
 
 module.exports = app;
