@@ -7,7 +7,7 @@ const verifyToken = require('../../middlewares/auth');
 const pool = require('../../database');
 const bcrypt = require('bcrypt'); // Asegúrate de importar bcrypt
 //Ruta frontendimage.pngimage.png
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
 //USER AND EMAIL
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_USER = process.env.EMAIL_USER;
