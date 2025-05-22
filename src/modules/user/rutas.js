@@ -40,9 +40,10 @@ router.get(
     );
 
     // Redirige al frontend pasando el token como parámetro en la URL
-    res.redirect(`${FRONTEND_URL}/home?token=${token}`);
+    res.redirect(`${FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
   }
 );
+
 
 
 // Ruta para cerrar sesión
