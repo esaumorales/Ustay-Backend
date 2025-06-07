@@ -44,17 +44,17 @@ const deleteImageByUrl = async (url) => {
 // Rutas
 
 // Obtener todas las propiedades
+// Modificar la consulta en GET /
 router.get('/', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
     const [propiedades] = await connection.query(`
-      SELECT p.*, d.direccion as direccion_completa, pe.periodo, 
+      SELECT p.*, d.direccion as direccion_completa,
              u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
              u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner,
              u.google_foto as foto_partner, p.foto_2, p.foto_3
       FROM Propiedad p
       LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
-      LEFT JOIN Periodo pe ON p.periodo_id = pe.periodo_id
       LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
       LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
     `);
@@ -66,18 +66,17 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// Obtener propiedad específica
+// Modificar la consulta en GET /:id
 router.get('/:id', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
     const [propiedades] = await connection.query(`
-      SELECT p.*, d.direccion as direccion_completa, pe.periodo,
+      SELECT p.*, d.direccion as direccion_completa,
              u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
              u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner,
              u.google_foto as foto_partner, pa.telefono as telefono_partner, p.foto_2, p.foto_3
       FROM Propiedad p
       LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
-      LEFT JOIN Periodo pe ON p.periodo_id = pe.periodo_id
       LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
       LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
       WHERE p.propiedad_id = ?
@@ -89,9 +88,10 @@ router.get('/:id', verifyToken, async (req, res) => {
     }
 
     const [cuartos] = await connection.query(`
-      SELECT c.*, tc.tipo as tipo_cuarto
+      SELECT c.*, tc.tipo as tipo_cuarto, pe.periodo
       FROM Cuarto c
       LEFT JOIN Tipo_Cuarto tc ON c.tipo_cuarto_id = tc.tipo_cuarto_id
+      LEFT JOIN Periodo pe ON c.periodo_id = pe.periodo_id
       WHERE c.propiedad_id = ?
     `, [req.params.id]);
 
@@ -111,12 +111,10 @@ router.get('/partner/:partnerId', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
     const [propiedades] = await connection.query(`
-      SELECT p.*, d.direccion as direccion_completa, pe.periodo,
-             u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
+      SELECT p.*, d.direccion as direccion_completa, u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
              u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner
       FROM Propiedad p
       LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
-      LEFT JOIN Periodo pe ON p.periodo_id = pe.periodo_id
       LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
       LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
       WHERE p.partner_id = ?
@@ -154,8 +152,8 @@ router.post('/', verifyToken, async (req, res) => {
     // Insertar propiedad
     const [propiedadResult] = await connection.query(`
       INSERT INTO Propiedad (
-        partner_id, direccion_id, reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, periodo_id, n_pisos, referencia
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        partner_id, direccion_id, reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, n_pisos, referencia
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       partner_id || null,
       direccion_id,
@@ -166,7 +164,6 @@ router.post('/', verifyToken, async (req, res) => {
       foto_3_url || null,
       direccion || null,
       estado_verificacion || null,
-      periodo_id || null,
       n_pisos || null,
       referencia || null
     ]);
@@ -290,29 +287,6 @@ router.delete('/:id', verifyToken, async (req, res) => {
     res.json({ message: 'Propiedad eliminada exitosamente' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar propiedad', error: error.message });
-  }
-});
-
-// Obtener propiedades por estado de verificación
-router.get('/estado/:estado', verifyToken, async (req, res) => {
-  try {
-    const connection = await pool.getConnection();
-    const [propiedades] = await connection.query(`
-      SELECT p.*, d.direccion as direccion_completa, pe.periodo,
-             u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
-             u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner
-      FROM Propiedad p
-      LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
-      LEFT JOIN Periodo pe ON p.periodo_id = pe.periodo_id
-      LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
-      LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
-      WHERE p.estado_verificacion = ?
-    `, [req.params.estado]);
-    connection.release();
-
-    res.json({ propiedades });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener propiedades por estado', error: error.message });
   }
 });
 
