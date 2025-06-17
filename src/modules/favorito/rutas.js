@@ -7,7 +7,6 @@ const pool = require('../../database');
 router.get('/usuario/:usuarioId', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
-    // ... existing code ...
     const [favoritos] = await connection.query(
       `
     SELECT 
@@ -34,7 +33,6 @@ router.get('/usuario/:usuarioId', verifyToken, async (req, res) => {
 `,
       [req.params.usuarioId]
     );
-    // ... existing code ...
     connection.release();
 
     // Puedes unir los apellidos y nombre para mostrar el propietario completo

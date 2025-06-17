@@ -41,16 +41,13 @@ const deleteImageByUrl = async (url) => {
   }
 };
 
-// Rutas
-
 // Obtener todas las propiedades
-// Modificar la consulta en GET /
 router.get('/', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
     const [propiedades] = await connection.query(`
       SELECT p.*, d.direccion as direccion_completa,
-             u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
+             u.nombre as nombre_partner, u.apellido_pa as apellido_partner, 
              u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner,
              u.google_foto as foto_partner, p.foto_2, p.foto_3
       FROM Propiedad p
@@ -63,6 +60,19 @@ router.get('/', verifyToken, async (req, res) => {
     res.json({ propiedades });
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener propiedades', error: error.message });
+  }
+});
+router.get('/zonas', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    const [zonas] = await connection.query(`
+      SELECT DISTINCT zona FROM Propiedad;
+    `);
+    connection.release();
+
+    res.json({ zonas });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener zonas', error: error.message });
   }
 });
 
