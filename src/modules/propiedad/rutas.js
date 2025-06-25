@@ -216,7 +216,7 @@ router.get('/partner/:partnerId', verifyToken, async (req, res) => {
 // Crear una nueva propiedad
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { partner_id, direccion, reglas, descripcion, foto, foto_2, foto_3, estado_verificacion, periodo_id, n_pisos, referencia } = req.body;
+    const { partner_id, direccion, reglas, descripcion, foto, foto_2, foto_3, estado_verificacion, periodo_id, n_pisos, referencia, latitud, longitud } = req.body;
 
     // Subir imágenes a Cloudinary
     const foto_url = await uploadToCloudinary(foto);
@@ -238,8 +238,8 @@ router.post('/', verifyToken, async (req, res) => {
     // Insertar propiedad
     const [propiedadResult] = await connection.query(`
       INSERT INTO Propiedad (
-        partner_id, direccion_id, reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, n_pisos, referencia
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        partner_id, direccion_id, reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, n_pisos, referencia, latitud, longitud
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       partner_id || null,
       direccion_id,
@@ -251,7 +251,9 @@ router.post('/', verifyToken, async (req, res) => {
       direccion || null,
       estado_verificacion || null,
       n_pisos || null,
-      referencia || null
+      referencia || null,
+      latitud || null,
+      longitud || null 
     ]);
 
     connection.release();
@@ -268,7 +270,7 @@ router.post('/', verifyToken, async (req, res) => {
 // Actualizar propiedad existente
 router.put('/propiedad-edit/:id', verifyToken, async (req, res) => {
   try {
-    const { reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, periodo_id, n_pisos, referencia } = req.body;
+    const { reglas, descripcion, foto, foto_2, foto_3, direccion, estado_verificacion, periodo_id, n_pisos, referencia, latitud, longitud } = req.body;
 
     const connection = await pool.getConnection();
 
@@ -322,6 +324,8 @@ router.put('/propiedad-edit/:id', verifyToken, async (req, res) => {
     if (periodo_id !== undefined) updateFields.periodo_id = periodo_id;
     if (n_pisos !== undefined) updateFields.n_pisos = n_pisos;
     if (referencia !== undefined) updateFields.referencia = referencia;
+    if (latitud !== undefined) updateFields.latitud = latitud;
+    if (longitud !== undefined) updateFields.longitud = longitud;
 
     if (Object.keys(updateFields).length > 0) {
       const setClause = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
