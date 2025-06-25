@@ -155,11 +155,12 @@ router.get('/:id', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
 
-    // Consulta para obtener la información del cuarto
+    // Consulta para obtener la información del cuarto (incluye lat/lng desde Propiedad)
     const [cuartos] = await connection.query(
       `
       SELECT c.cuarto_id, c.propiedad_id, c.tipo_cuarto_id, c.precio, c.nombre, c.dimensiones, c.valoracion,
              c.n_piso, c.n_cuarto, c.descripcion, c.disponibilidad, c.informacion_adicional, 
+             p.latitud, p.longitud,
              tc.tipo as tipo_cuarto, p.direccion as direccion_propiedad, pr.periodo, p.reglas, 
              u.nombre as nombre_usuario, u.apellido_pa as apellido_usuario, pa.n_dni, pa.direccion, pa.telefono
       FROM Cuarto c
@@ -169,7 +170,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
       LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
       WHERE c.cuarto_id = ?
-    `,
+      `,
       [req.params.id]
     );
 
@@ -178,10 +179,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Cuarto no encontrado' });
     }
 
-    cuartos[0].informacion_adicional = cuartos[0].informacion_adicional.replace(
-      /,/g,
-      '\n'
-    );
+    cuartos[0].informacion_adicional = cuartos[0].informacion_adicional.replace(/,/g, '\n');
 
     // Obtener los servicios personalizados para este cuarto
     const [servicios] = await connection.query(
@@ -190,21 +188,19 @@ router.get('/:id', verifyToken, async (req, res) => {
       FROM Servicio s
       JOIN Servicio_x_Cuarto sc ON s.servicio_id = sc.servicio_id
       WHERE sc.cuarto_id = ?
-    `,
+      `,
       [req.params.id]
     );
 
     // Obtener las fotos asociadas al cuarto
     const [fotos] = await connection.query(
-      `
-      SELECT * FROM Foto WHERE cuarto_id = ?
-    `,
+      `SELECT * FROM Foto WHERE cuarto_id = ?`,
       [req.params.id]
     );
 
     connection.release();
 
-    // Responder con los datos del cuarto, servicios y fotos
+    // Responder con los datos del cuarto, incluyendo latitud/longitud
     res.json({
       cuarto: {
         ...cuartos[0],
@@ -224,9 +220,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       fotos,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Error al obtener cuarto', error: error.message });
+    res.status(500).json({ message: 'Error al obtener cuarto', error: error.message });
   }
 });
 
