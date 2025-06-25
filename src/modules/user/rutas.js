@@ -7,11 +7,11 @@ const verifyToken = require('../../middlewares/auth');
 const pool = require('../../database');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
 
 const FRONTEND_URL = process.env.FRONTEND_URL || '';
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_USER = process.env.EMAIL_USER;
-
 // Función para formatear fecha a formato MySQL DATETIME
 function formatDateToMySQL(date) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -353,14 +353,14 @@ router.post('/verify-email', async (req, res) => {
         message: 'Código inválido o expirado',
       });
     }
-
+    const newUUID = uuidv4(); 
     // Crear usuario con los datos temporales
     const [result] = await connection.query(
       `INSERT INTO Usuario (
         rol_id, nombre, apellido_pa, apellido_ma, 
         correo_electronico, contrasena, 
-        correo_verificado
-      ) VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+        correo_verificado, uuid
+      ) VALUES (?, ?, ?, ?, ?, ?, TRUE, ?)`,
       [
         registroTemp[0].rol_id,
         registroTemp[0].nombre,
@@ -368,6 +368,7 @@ router.post('/verify-email', async (req, res) => {
         registroTemp[0].apellido_ma,
         registroTemp[0].correo_electronico,
         registroTemp[0].contrasena,
+        newUUID,
       ]
     );
 

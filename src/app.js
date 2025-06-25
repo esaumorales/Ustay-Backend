@@ -17,6 +17,7 @@ const resenaRoutes = require('./modules/resena/rutas');
 const favoritoRoutes = require('./modules/favorito/rutas');
 const inspeccionRoutes = require('./modules/inspeccion/rutas');
 const subscripcionRoutes = require('./modules/subscripcion/rutas');
+const puntosRoutes = require('./modules/puntos/rutas');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/resena', resenaRoutes);
 app.use('/favorito', favoritoRoutes);
 app.use('/inspeccion', inspeccionRoutes);
 app.use('/subscripcion', subscripcionRoutes);
+app.use('/puntos', puntosRoutes);
 
 // Ruta base simple
 app.get('/', (req, res) => {

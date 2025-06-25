@@ -88,4 +88,29 @@ router.get('/me', verifyToken, async (req, res) => {
     }
 });
 
+// Nueva ruta pública: /partner/public/:uuid
+router.get('/public/:uuid', async (req, res) => {
+    const { uuid } = req.params;
+    const connection = await pool.getConnection();
+    try {
+      const [partner] = await connection.query(`
+        SELECT u.uuid, u.nombre, u.apellido_pa, p.direccion
+        FROM Partner p
+        JOIN Usuario u ON p.partner_id = u.usuario_id
+        WHERE u.uuid = ?
+      `, [uuid]);
+  
+      if (partner.length === 0) {
+        return res.status(404).json({ message: 'Partner no encontrado' });
+      }
+  
+      res.json({ partner: partner[0] });
+    } catch (error) {
+      res.status(500).json({ message: 'Error', error: error.message });
+    } finally {
+      connection.release();
+    }
+  });
+  
+
 module.exports = router;

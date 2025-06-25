@@ -76,15 +76,75 @@ router.get('/zonas', async (req, res) => {
   }
 });
 
-// Modificar la consulta en GET /:id
-router.get('/:id', verifyToken, async (req, res) => {
+// Obtener propiedad por UUID (nuevo)
+router.get('/uuid/:uuid', verifyToken, async (req, res) => {
   try {
     const connection = await pool.getConnection();
+
     const [propiedades] = await connection.query(`
       SELECT p.*, d.direccion as direccion_completa,
              u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
              u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner,
-             u.google_foto as foto_partner, pa.telefono as telefono_partner, p.foto_2, p.foto_3
+             u.google_foto as foto_partner, pa.telefono as telefono_partner,
+             p.foto_2, p.foto_3
+      FROM Propiedad p
+      LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
+      LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
+      LEFT JOIN Usuario u ON pa.partner_id = u.usuario_id
+      WHERE p.uuid = ?
+    `, [req.params.uuid]);
+
+    if (propiedades.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: 'Propiedad no encontrada por UUID' });
+    }
+
+    const [cuartos] = await connection.query(`
+      SELECT c.*, tc.tipo as tipo_cuarto, pe.periodo
+      FROM Cuarto c
+      LEFT JOIN Tipo_Cuarto tc ON c.tipo_cuarto_id = tc.tipo_cuarto_id
+      LEFT JOIN Periodo pe ON c.periodo_id = pe.periodo_id
+      WHERE c.propiedad_id = ?
+    `, [propiedades[0].propiedad_id]);
+
+    connection.release();
+
+    const propiedad = propiedades[0];
+    propiedad.cuartos = cuartos;
+
+    if (propiedad.foto) {
+      propiedad.foto = cloudinary.url(propiedad.foto, { width: 800, crop: 'scale' });
+    }
+    if (propiedad.foto_2) {
+      propiedad.foto_2 = cloudinary.url(propiedad.foto_2, { width: 800, crop: 'scale' });
+    }
+    if (propiedad.foto_3) {
+      propiedad.foto_3 = cloudinary.url(propiedad.foto_3, { width: 800, crop: 'scale' });
+    }
+
+    res.json({ propiedad });
+  } catch (error) {
+    console.error('Error al obtener propiedad por UUID:', error);
+    res.status(500).json({
+      message: 'Error al obtener propiedad por UUID',
+      error: error.message,
+    });
+  }
+});
+
+
+// Modificar la consulta en GET /:id
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+
+    // Obtener propiedad
+    const [propiedades] = await connection.query(`
+      SELECT p.*, d.direccion as direccion_completa,
+             u.nombre as nombre_partner, u.apellido_pa as apellido_partner,
+             u.apellido_ma as apellido_ma_partner, u.correo_electronico as correo_partner,
+             u.google_foto as foto_partner, pa.telefono as telefono_partner,
+             p.foto_2, p.foto_3
       FROM Propiedad p
       LEFT JOIN Direccion d ON p.direccion_id = d.direccion_id
       LEFT JOIN Partner pa ON p.partner_id = pa.partner_id
@@ -97,6 +157,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Propiedad no encontrada' });
     }
 
+    // Obtener cuartos
     const [cuartos] = await connection.query(`
       SELECT c.*, tc.tipo as tipo_cuarto, pe.periodo
       FROM Cuarto c
@@ -110,9 +171,24 @@ router.get('/:id', verifyToken, async (req, res) => {
     const propiedad = propiedades[0];
     propiedad.cuartos = cuartos;
 
+    // Aplicar URLs Cloudinary si existen
+    if (propiedad.foto) {
+      propiedad.foto = cloudinary.url(propiedad.foto, { width: 800, crop: 'scale' });
+    }
+    if (propiedad.foto_2) {
+      propiedad.foto_2 = cloudinary.url(propiedad.foto_2, { width: 800, crop: 'scale' });
+    }
+    if (propiedad.foto_3) {
+      propiedad.foto_3 = cloudinary.url(propiedad.foto_3, { width: 800, crop: 'scale' });
+    }
+
     res.json({ propiedad });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener propiedad', error: error.message });
+    console.error('Error al obtener propiedad:', error);
+    res.status(500).json({
+      message: 'Error al obtener propiedad',
+      error: error.message,
+    });
   }
 });
 
