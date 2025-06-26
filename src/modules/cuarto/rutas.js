@@ -38,7 +38,12 @@ router.get('/uuid/:uuid', async (req, res) => {
 
     res.json({ cuarto: cuartos[0] });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener cuarto por UUID', error: error.message });
+    res
+      .status(500)
+      .json({
+        message: 'Error al obtener cuarto por UUID',
+        error: error.message,
+      });
   }
 });
 
@@ -179,7 +184,10 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Cuarto no encontrado' });
     }
 
-    cuartos[0].informacion_adicional = cuartos[0].informacion_adicional.replace(/,/g, '\n');
+    cuartos[0].informacion_adicional = cuartos[0].informacion_adicional.replace(
+      /,/g,
+      '\n'
+    );
 
     // Obtener los servicios personalizados para este cuarto
     const [servicios] = await connection.query(
@@ -220,7 +228,9 @@ router.get('/:id', verifyToken, async (req, res) => {
       fotos,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener cuarto', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error al obtener cuarto', error: error.message });
   }
 });
 
@@ -286,15 +296,15 @@ router.get('/partnerRoom/:partnerId', verifyToken, async (req, res) => {
       [partnerId]
     );
 
-    /* ---- ÚLTIMAS PROMOCIONES ---- */
+    /* ---- PROMOCIÓN MÁS RECIENTE POR FECHA_FIN ---- */
     const [promociones] = await connection.query(
-      `SELECT pc.*
+      `SELECT pc.promocion_id, pc.cuarto_id, pc.estado, pc.nombre_plan, pc.fecha_inicio, pc.fecha_fin, pc.plan_id
        FROM PromocionCuarto pc
        INNER JOIN (
-         SELECT cuarto_id, MAX(fecha_inicio) AS ultima
+         SELECT cuarto_id, MAX(fecha_fin) AS ultima
          FROM PromocionCuarto
          GROUP BY cuarto_id
-       ) sub ON pc.cuarto_id = sub.cuarto_id AND pc.fecha_inicio = sub.ultima
+       ) sub ON pc.cuarto_id = sub.cuarto_id AND pc.fecha_fin = sub.ultima
        WHERE pc.usuario_id = ?`,
       [partnerId]
     );
@@ -326,19 +336,16 @@ router.get('/partnerRoom/:partnerId', verifyToken, async (req, res) => {
         : '';
 
       const promocion = promociones.find((p) => p.cuarto_id === c.cuarto_id);
-      const hoy = new Date();
-      let estadoPromocion = 'Inactiva';
-      let diasRestantes = null;
 
-      if (promocion) {
-        const fin = new Date(promocion.fecha_fin);
-        if (hoy < fin) {
-          estadoPromocion = 'Activa';
-          diasRestantes = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-        } else {
-          estadoPromocion = 'Finalizada';
-        }
-      }
+      const diasRestantes = promocion?.fecha_fin
+        ? Math.max(
+            Math.ceil(
+              (new Date(promocion.fecha_fin) - new Date()) /
+                (1000 * 60 * 60 * 24)
+            ),
+            0
+          )
+        : null;
 
       return {
         cuarto_id: c.cuarto_id,
@@ -371,10 +378,12 @@ router.get('/partnerRoom/:partnerId', verifyToken, async (req, res) => {
         servicios: cuartoServicios,
         promocion: promocion
           ? {
+              promocion_id: promocion.promocion_id,
+              plan_id: promocion.plan_id,
+              estado: promocion.estado,
               nombre_plan: promocion.nombre_plan,
               fecha_inicio: promocion.fecha_inicio,
               fecha_fin: promocion.fecha_fin,
-              estado: estadoPromocion,
               dias_restantes: diasRestantes,
             }
           : null,
@@ -392,6 +401,8 @@ router.get('/partnerRoom/:partnerId', verifyToken, async (req, res) => {
     connection?.release();
   }
 });
+
+
 
 
 // Actualizar cuarto existente
@@ -634,11 +645,15 @@ router.post('/', verifyToken, async (req, res) => {
       !servicios ||
       !serviceDetails
     ) {
-      return res.status(400).json({ message: 'Faltan campos obligatorios o serviceDetails' });
+      return res
+        .status(400)
+        .json({ message: 'Faltan campos obligatorios o serviceDetails' });
     }
 
     if (typeof serviceDetails !== 'object' || serviceDetails === null) {
-      return res.status(400).json({ message: 'serviceDetails debe ser un objeto' });
+      return res
+        .status(400)
+        .json({ message: 'serviceDetails debe ser un objeto' });
     }
 
     const servicioMap = {
@@ -687,17 +702,24 @@ router.post('/', verifyToken, async (req, res) => {
         ]
       );
 
-      if (!Array.isArray(servicios) || servicios.some((s) => typeof s !== 'string')) {
-        return res.status(400).json({ message: 'Los servicios deben ser un arreglo de strings' });
+      if (
+        !Array.isArray(servicios) ||
+        servicios.some((s) => typeof s !== 'string')
+      ) {
+        return res
+          .status(400)
+          .json({ message: 'Los servicios deben ser un arreglo de strings' });
       }
 
       if (servicios.length > 0) {
-        const servicioValues = servicios.map((servicio) => {
-          const servicio_id = servicioMap[servicio];
-          const descripcion = serviceDetails[servicio] || 'Sin descripción';
-          if (!servicio_id) return null;
-          return [servicio_id, cuartoResult.insertId, descripcion];
-        }).filter((v) => v !== null);
+        const servicioValues = servicios
+          .map((servicio) => {
+            const servicio_id = servicioMap[servicio];
+            const descripcion = serviceDetails[servicio] || 'Sin descripción';
+            if (!servicio_id) return null;
+            return [servicio_id, cuartoResult.insertId, descripcion];
+          })
+          .filter((v) => v !== null);
 
         if (servicioValues.length > 0) {
           await connection.query(
@@ -719,8 +741,14 @@ router.post('/', verifyToken, async (req, res) => {
         }
 
         if (fotosUrls.length > 0) {
-          const fotoValues = fotosUrls.map((url) => [cuartoResult.insertId, url]);
-          await connection.query('INSERT INTO Foto (cuarto_id, url_imagen) VALUES ?', [fotoValues]);
+          const fotoValues = fotosUrls.map((url) => [
+            cuartoResult.insertId,
+            url,
+          ]);
+          await connection.query(
+            'INSERT INTO Foto (cuarto_id, url_imagen) VALUES ?',
+            [fotoValues]
+          );
         }
       }
 
@@ -739,6 +767,8 @@ router.post('/', verifyToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Error en la creación del cuarto:', error.message);
-    res.status(500).json({ message: 'Error al crear cuarto', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error al crear cuarto', error: error.message });
   }
 });
