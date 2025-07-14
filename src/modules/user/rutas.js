@@ -99,10 +99,44 @@ router.post('/recover-password', async (req, res) => {
     });
 
     const mailOptions = {
-      from: EMAIL_USER,
+      from: `"Soporte USTAY" <${EMAIL_USER}>`,
       to: correo_electronico,
       subject: 'Recuperación de contraseña',
-      text: `Tu código de verificación es: ${verificationCode}\nEste código expirará en 30 minutos.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; background-color: #F9F9F9; padding: 30px;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: white; border: 1px solid #ddd; border-radius: 8px; padding: 30px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <img src="https://tulogo.com/logo.png" alt="Logo" style="height: 60px;" />
+              <h2 style="color: #F05B20; margin: 10px 0 0;">Recuperación de Contraseña</h2>
+            </div>
+    
+            <p style="color: #111827; font-size: 16px;">Estimado usuario,</p>
+    
+            <p style="color: #111827; font-size: 15px;">
+              Hemos recibido una solicitud para restablecer la contraseña de su cuenta asociada a este correo electrónico.
+            </p>
+    
+            <p style="color: #111827; font-size: 15px; font-weight: bold;">Su código de verificación es:</p>
+    
+            <div style="background-color: #F05B20; color: white; font-size: 22px; font-weight: bold; text-align: center; padding: 12px 0; border-radius: 6px; margin: 20px 0;">
+              ${verificationCode}
+            </div>
+    
+            <p style="color: #111827; font-size: 14px;">
+              Este código expirará en 30 minutos. Si usted no solicitó este cambio, puede ignorar este mensaje con tranquilidad.
+            </p>
+    
+            <p style="color: #070A13; font-size: 14px; margin-top: 30px;">
+              Atentamente,<br>
+              <strong>Equipo de Soporte USTAY</strong>
+            </p>
+          </div>
+    
+          <div style="text-align: center; font-size: 12px; color: #888; margin-top: 20px;">
+            © ${new Date().getFullYear()} USTAY. Todos los derechos reservados.
+          </div>
+        </div>
+      `,
     };
 
     await transporter.sendMail(mailOptions);
