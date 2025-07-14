@@ -106,7 +106,7 @@ router.post('/recover-password', async (req, res) => {
         <div style="font-family: Arial, sans-serif; background-color: #F9F9F9; padding: 30px;">
           <div style="max-width: 600px; margin: 0 auto; background-color: white; border: 1px solid #ddd; border-radius: 8px; padding: 30px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <img src="https://tulogo.com/logo.png" alt="Logo" style="height: 60px;" />
+              <img src="https://imgur.com/a/vptOVR3" alt="Logo" style="height: 60px;" />
               <h2 style="color: #F05B20; margin: 10px 0 0;">Recuperación de Contraseña</h2>
             </div>
     
