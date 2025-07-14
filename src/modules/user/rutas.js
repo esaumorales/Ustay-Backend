@@ -77,7 +77,9 @@ router.post('/recover-password', async (req, res) => {
         .json({ message: 'No existe una cuenta con este correo electrónico' });
     }
 
-    const verificationCode = Math.floor(10000 + Math.random() * 90000).toString();
+    const verificationCode = Math.floor(
+      10000 + Math.random() * 90000
+    ).toString();
 
     const expirationTime = new Date();
     expirationTime.setMinutes(expirationTime.getMinutes() + 30);
@@ -152,7 +154,9 @@ router.post('/verify-code', async (req, res) => {
       userId: user.usuario_id,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al verificar el código', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error al verificar el código', error: error.message });
   } finally {
     if (connection) connection.release();
   }
@@ -199,9 +203,9 @@ router.post('/change-password', async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res
-        .status(400)
-        .json({ message: 'No se actualizó la contraseña. Verifica el correo.' });
+      return res.status(400).json({
+        message: 'No se actualizó la contraseña. Verifica el correo.',
+      });
     }
 
     res.json({
@@ -209,7 +213,10 @@ router.post('/change-password', async (req, res) => {
       userId: user.usuario_id,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar la contraseña', error: error.message });
+    res.status(500).json({
+      message: 'Error al actualizar la contraseña',
+      error: error.message,
+    });
   } finally {
     if (connection) connection.release();
   }
@@ -235,12 +242,16 @@ router.post('/register', async (req, res) => {
       !contrasena ||
       !rol_id
     ) {
-      return res.status(400).json({ message: 'Todos los campos son requeridos' });
+      return res
+        .status(400)
+        .json({ message: 'Todos los campos son requeridos' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(correo_electronico)) {
-      return res.status(400).json({ message: 'Formato de correo electrónico inválido' });
+      return res
+        .status(400)
+        .json({ message: 'Formato de correo electrónico inválido' });
     }
 
     connection = await pool.getConnection();
@@ -251,7 +262,9 @@ router.post('/register', async (req, res) => {
     );
 
     if (existingUser.length > 0) {
-      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+      return res
+        .status(400)
+        .json({ message: 'El correo electrónico ya está registrado' });
     }
 
     // Eliminar registros temporales previos para evitar duplicados
@@ -263,7 +276,9 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(contrasena, salt);
 
-    const codigo_verificacion = Math.floor(10000 + Math.random() * 90000).toString();
+    const codigo_verificacion = Math.floor(
+      10000 + Math.random() * 90000
+    ).toString();
     const expiracion = new Date();
     expiracion.setHours(expiracion.getHours() + 1);
     const expiracionFormatted = formatDateToMySQL(expiracion);
@@ -329,7 +344,9 @@ router.post('/verify-email', async (req, res) => {
     const { correo_electronico, codigo } = req.body;
 
     if (!correo_electronico || !codigo) {
-      return res.status(400).json({ message: 'Correo y código son requeridos' });
+      return res
+        .status(400)
+        .json({ message: 'Correo y código son requeridos' });
     }
 
     connection = await pool.getConnection();
@@ -353,7 +370,7 @@ router.post('/verify-email', async (req, res) => {
         message: 'Código inválido o expirado',
       });
     }
-    const newUUID = uuidv4(); 
+    const newUUID = uuidv4();
     // Crear usuario con los datos temporales
     const [result] = await connection.query(
       `INSERT INTO Usuario (
@@ -414,7 +431,9 @@ router.post('/login', async (req, res) => {
     const { correo_electronico, contrasena } = req.body;
 
     if (!correo_electronico || !contrasena) {
-      return res.status(400).json({ message: 'Correo electrónico y contraseña son requeridos' });
+      return res
+        .status(400)
+        .json({ message: 'Correo electrónico y contraseña son requeridos' });
     }
 
     const connection = await pool.getConnection();
@@ -457,7 +476,9 @@ router.post('/login', async (req, res) => {
       message: 'Login exitoso',
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error en el servidor', error: error.message });
   }
 });
 
@@ -467,9 +488,12 @@ router.get('/perfil', verifyToken, async (req, res) => {
   try {
     connection = await pool.getConnection();
     const [users] = await connection.query(
-      'SELECT usuario_id, rol_id, nombre, apellido_pa, apellido_ma, correo_electronico FROM Usuario WHERE usuario_id = ?',
+      `SELECT usuario_id, rol_id, nombre, apellido_pa, apellido_ma, correo_electronico, fecha_registro 
+       FROM Usuario 
+       WHERE usuario_id = ?`,
       [req.user.id]
     );
+    console.log(users[0]);
 
     if (users.length === 0) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -477,7 +501,9 @@ router.get('/perfil', verifyToken, async (req, res) => {
 
     res.json({ user: users[0], message: 'Perfil obtenido exitosamente' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener perfil', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error al obtener perfil', error: error.message });
   } finally {
     if (connection) connection.release();
   }
@@ -497,7 +523,8 @@ router.put('/update-role/:usuarioId', verifyToken, async (req, res) => {
     if (adminUser.length === 0 || adminUser[0].rol_id !== 3) {
       connection.release();
       return res.status(403).json({
-        message: 'Acceso denegado: solo los administradores pueden cambiar roles',
+        message:
+          'Acceso denegado: solo los administradores pueden cambiar roles',
       });
     }
 
@@ -535,7 +562,9 @@ router.put('/update-role/:usuarioId', verifyToken, async (req, res) => {
 
     res.json({ message: 'Rol actualizado exitosamente' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar rol', error: error.message });
+    res
+      .status(500)
+      .json({ message: 'Error al actualizar rol', error: error.message });
   }
 });
 
