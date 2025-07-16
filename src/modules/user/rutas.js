@@ -27,20 +27,25 @@ router.get(
 // Callback de Google OAuth mejorado
 router.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/' }),
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.FRONTEND_URL}/home?error=auth_failed`,
+  }),
   async (req, res) => {
     let connection;
     try {
       if (!req.user) {
-        return res.status(401).json({ message: 'Autenticación fallida' });
+        console.error('No se recibió req.user en el callback de Google');
+        return res.redirect(`${FRONTEND_URL}/home?error=auth_failed`);
       }
+
+      console.log('Usuario recibido en callback:', req.user);
 
       connection = await pool.getConnection();
 
       // Verificar si el usuario ya existe en la base de datos
       const [existingUsers] = await connection.query(
         'SELECT * FROM Usuario WHERE correo_electronico = ?',
-        [req.user.email]
+        [req.user.correo_electronico]
       );
 
       let usuario;
@@ -59,12 +64,12 @@ router.get(
           ) VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, NOW())`,
           [
             1, // rol_id por defecto (usuario normal)
-            req.user.name.split(' ')[0] || 'Usuario',
-            req.user.name.split(' ')[1] || '',
-            req.user.name.split(' ')[2] || '',
-            req.user.email,
+            req.user.nombre || 'Usuario',
+            req.user.apellido_pa || '',
+            req.user.apellido_ma || '',
+            req.user.correo_electronico,
             newUUID,
-            req.user.googleId
+            req.user.google_id,
           ]
         );
 
@@ -87,11 +92,12 @@ router.get(
         { expiresIn: config.jwt.expiresIn }
       );
 
+      console.log('Token generado:', token);
       // Redirigir al frontend con el token
       res.redirect(`${FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
     } catch (error) {
       console.error('Error en Google OAuth callback:', error);
-      res.redirect(`${FRONTEND_URL}/login?error=auth_failed`);
+      res.redirect(`${FRONTEND_URL}/home?error=auth_failed`);
     } finally {
       if (connection) connection.release();
     }
@@ -144,7 +150,7 @@ router.post('/recover-password', async (req, res) => {
       [verificationCode, expirationFormatted, correo_electronico]
     );
 
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: EMAIL_USER,
@@ -368,7 +374,7 @@ router.post('/register', async (req, res) => {
     const codigo_verificacion = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    
+
     const expiracion = new Date();
     expiracion.setHours(expiracion.getHours() + 1);
     const expiracionFormatted = formatDateToMySQL(expiracion);

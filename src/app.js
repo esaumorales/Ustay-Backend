@@ -22,45 +22,20 @@ const puntosRoutes = require('./modules/puntos/rutas');
 const app = express();
 
 // Middlewares
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL, // Permitir solo el frontend
-    credentials: true, // Permitir envío de cookies/sesiones
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(
-  session({
+app.use(cors({
+    origin: process.env.FRONTEND_URL, 
+    credentials: true // Permitir cookies/sesiones
+  }));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(session({
     secret: process.env.SESSION_SECRET || 'your_secret_key', // Usar variable de entorno
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' }, // Cookies seguras en producción
-  })
-);
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Rutas de autenticación con Google
-app.get(
-  '/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get(
-  '/auth/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed`,
-  }),
-  (req, res) => {
-    console.log('Callback URL configurada:', process.env.GOOGLE_CALLBACK_URL);
-    console.log('Frontend URL:', process.env.FRONTEND_URL);
-    console.log('Usuario recibido:', req.user);
-    // Generar un token JWT (o tu lógica de token)
-    const token = 'tu_logica_para_generar_token'; // Implementa tu lógica de JWT aquí
-    res.redirect(`${process.env.FRONTEND_URL}/home?token=${token}`);
-  }
-);
+    cookie: { secure: process.env.NODE_ENV === 'production' } // Cookies seguras en producción
+  }));
+  app.use(passport.initialize());
+  app.use(passport.session());
 
 // Rutas de la app
 app.use('/', userRoutes);
