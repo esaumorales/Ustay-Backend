@@ -12,6 +12,7 @@ const { v4: uuidv4 } = require('uuid');
 const FRONTEND_URL = process.env.FRONTEND_URL || '';
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_USER = process.env.EMAIL_USER;
+
 // Función para formatear fecha a formato MySQL DATETIME
 function formatDateToMySQL(date) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
@@ -23,25 +24,77 @@ router.get(
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
+// Callback de Google OAuth mejorado
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
-  (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Autenticación fallida' });
+  async (req, res) => {
+    let connection;
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Autenticación fallida' });
+      }
+
+      connection = await pool.getConnection();
+
+      // Verificar si el usuario ya existe en la base de datos
+      const [existingUsers] = await connection.query(
+        'SELECT * FROM Usuario WHERE correo_electronico = ?',
+        [req.user.email]
+      );
+
+      let usuario;
+
+      if (existingUsers.length > 0) {
+        // Usuario existe, usar datos existentes
+        usuario = existingUsers[0];
+      } else {
+        // Usuario no existe, crear nuevo usuario
+        const newUUID = uuidv4();
+        const [result] = await connection.query(
+          `INSERT INTO Usuario (
+            rol_id, nombre, apellido_pa, apellido_ma, 
+            correo_electronico, correo_verificado, uuid, 
+            google_id, fecha_registro
+          ) VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, NOW())`,
+          [
+            1, // rol_id por defecto (usuario normal)
+            req.user.name.split(' ')[0] || 'Usuario',
+            req.user.name.split(' ')[1] || '',
+            req.user.name.split(' ')[2] || '',
+            req.user.email,
+            newUUID,
+            req.user.googleId
+          ]
+        );
+
+        // Obtener el usuario recién creado
+        const [newUser] = await connection.query(
+          'SELECT * FROM Usuario WHERE usuario_id = ?',
+          [result.insertId]
+        );
+        usuario = newUser[0];
+      }
+
+      // Generar token JWT
+      const token = jwt.sign(
+        {
+          id: usuario.usuario_id,
+          email: usuario.correo_electronico,
+          rol: usuario.rol_id || 1,
+        },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
+
+      // Redirigir al frontend con el token
+      res.redirect(`${FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
+    } catch (error) {
+      console.error('Error en Google OAuth callback:', error);
+      res.redirect(`${FRONTEND_URL}/login?error=auth_failed`);
+    } finally {
+      if (connection) connection.release();
     }
-
-    const token = jwt.sign(
-      {
-        id: req.user.usuario_id,
-        email: req.user.correo_electronico,
-        rol: req.user.rol_id || 'usuario',
-      },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
-    );
-
-    res.redirect(`${FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
   }
 );
 
@@ -55,7 +108,7 @@ router.get('/logout', (req, res, next) => {
   });
 });
 
-// Ruta para recuperar contraseña
+// Ruta para recuperar contraseña (ACTUALIZADA A 6 DÍGITOS)
 router.post('/recover-password', async (req, res) => {
   let connection;
   try {
@@ -77,8 +130,9 @@ router.post('/recover-password', async (req, res) => {
         .json({ message: 'No existe una cuenta con este correo electrónico' });
     }
 
+    // CAMBIADO: Generar código de 6 dígitos
     const verificationCode = Math.floor(
-      10000 + Math.random() * 90000
+      100000 + Math.random() * 900000
     ).toString();
 
     const expirationTime = new Date();
@@ -90,7 +144,7 @@ router.post('/recover-password', async (req, res) => {
       [verificationCode, expirationFormatted, correo_electronico]
     );
 
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: 'gmail',
       auth: {
         user: EMAIL_USER,
@@ -256,7 +310,7 @@ router.post('/change-password', async (req, res) => {
   }
 });
 
-// Registro de usuario (paso 1)
+// Registro de usuario (paso 1) - ACTUALIZADO A 6 DÍGITOS
 router.post('/register', async (req, res) => {
   let connection;
   try {
@@ -310,9 +364,11 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(contrasena, salt);
 
+    // CAMBIADO: Generar código de 6 dígitos
     const codigo_verificacion = Math.floor(
-      10000 + Math.random() * 90000
+      100000 + Math.random() * 900000
     ).toString();
+    
     const expiracion = new Date();
     expiracion.setHours(expiracion.getHours() + 1);
     const expiracionFormatted = formatDateToMySQL(expiracion);
@@ -335,7 +391,7 @@ router.post('/register', async (req, res) => {
       ]
     );
 
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: 'gmail',
       auth: {
         user: EMAIL_USER,
