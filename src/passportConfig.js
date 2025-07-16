@@ -19,7 +19,7 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       let connection;
       try {
-        console.log('Iniciando GoogleStrategy con profile:', profile);
+        console.log('Perfil recibido de Google:', JSON.stringify(profile, null, 2));
         connection = await pool.getConnection();
         console.log('Conexión DB obtenida para GoogleStrategy');
 
@@ -27,33 +27,21 @@ passport.use(
           'SELECT * FROM Usuario WHERE google_id = ?',
           [profile.id]
         );
-        console.log(
-          'Usuario existente encontrado:',
-          existingUser.length ? existingUser : 'Ninguno'
-        );
+        console.log('Usuario existente encontrado:', existingUser.length ? existingUser : 'Ninguno');
 
         let user;
         if (existingUser.length > 0) {
           user = existingUser[0];
         } else {
-          const nameParts = profile.displayName
-            ? profile.displayName.split(' ')
-            : [];
+          const nameParts = profile.displayName ? profile.displayName.split(' ') : [];
           const nombre = nameParts[0] || '';
           const apellido_pa = nameParts.length > 1 ? nameParts[1] : '';
-          const apellido_ma =
-            nameParts.length > 2 ? nameParts.slice(2).join(' ') : '';
-          const email =
-            profile.emails && profile.emails.length > 0
-              ? profile.emails[0].value
-              : '';
-          const photo =
-            profile.photos && profile.photos.length > 0
-              ? profile.photos[0].value
-              : '';
+          const apellido_ma = nameParts.length > 2 ? nameParts.slice(2).join(' ') : '';
+          const email = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : '';
+          const photo = profile.photos && profile.photos.length > 0 ? profile.photos[0].value : '';
 
           if (!email) {
-            console.error('No se proporcionó correo electrónico en el profile');
+            console.error('No se proporcionó correo electrónico en el perfil');
             return done(new Error('Correo electrónico no disponible'), null);
           }
 
@@ -74,7 +62,7 @@ passport.use(
               apellido_ma,
               email,
               photo,
-              ROLE_USER,
+              ROLE_USER
             ]
           );
 
@@ -86,14 +74,14 @@ passport.use(
             apellido_ma,
             correo_electronico: email,
             google_foto: photo,
-            rol_id: ROLE_USER,
+            rol_id: ROLE_USER
           };
         }
 
         console.log('Usuario procesado correctamente:', user);
         return done(null, user);
       } catch (error) {
-        console.error('Error en GoogleStrategy:', error);
+        console.error('Error en GoogleStrategy:', error.message, error.stack);
         return done(error, null);
       } finally {
         if (connection) {
@@ -126,7 +114,7 @@ passport.deserializeUser(async (id, done) => {
     console.log('Usuario deserializado:', rows[0]);
     return done(null, rows[0]);
   } catch (error) {
-    console.error('Error en deserializeUser:', error);
+    console.error('Error en deserializeUser:', error.message, error.stack);
     return done(error, null);
   } finally {
     if (connection) {

@@ -33,29 +33,44 @@ router.get(
   async (req, res) => {
     let connection;
     try {
+      console.log('Callback recibido con req.user:', JSON.stringify(req.user, null, 2));
       if (!req.user) {
         console.error('No se recibió req.user en el callback de Google');
-        return res.redirect(`${FRONTEND_URL}/home?error=auth_failed`);
+        return res.redirect(`${process.env.FRONTEND_URL}/home?error=auth_failed`);
       }
 
-      console.log('Usuario recibido en callback:', req.user);
+      console.log('Datos de req.user:', {
+        correo_electronico: req.user.correo_electronico,
+        google_id: req.user.google_id,
+        nombre: req.user.nombre,
+        apellido_pa: req.user.apellido_pa,
+        apellido_ma: req.user.apellido_ma
+      });
 
       connection = await pool.getConnection();
+      console.log('Conexión a la base de datos establecida');
 
-      // Verificar si el usuario ya existe en la base de datos
       const [existingUsers] = await connection.query(
         'SELECT * FROM Usuario WHERE correo_electronico = ?',
         [req.user.correo_electronico]
       );
+      console.log('Resultado de la consulta de usuario:', JSON.stringify(existingUsers, null, 2));
 
       let usuario;
 
       if (existingUsers.length > 0) {
-        // Usuario existe, usar datos existentes
         usuario = existingUsers[0];
+        console.log('Usuario existente encontrado:', usuario);
       } else {
-        // Usuario no existe, crear nuevo usuario
         const newUUID = uuidv4();
+        console.log('Creando nuevo usuario con datos:', {
+          nombre: req.user.nombre,
+          apellido_pa: req.user.apellido_pa,
+          apellido_ma: req.user.apellido_ma,
+          correo_electronico: req.user.correo_electronico,
+          google_id: req.user.google_id
+        });
+
         const [result] = await connection.query(
           `INSERT INTO Usuario (
             rol_id, nombre, apellido_pa, apellido_ma, 
@@ -63,25 +78,24 @@ router.get(
             google_id, fecha_registro
           ) VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, NOW())`,
           [
-            1, // rol_id por defecto (usuario normal)
+            1,
             req.user.nombre || 'Usuario',
             req.user.apellido_pa || '',
             req.user.apellido_ma || '',
             req.user.correo_electronico,
             newUUID,
-            req.user.google_id,
+            req.user.google_id
           ]
         );
 
-        // Obtener el usuario recién creado
         const [newUser] = await connection.query(
           'SELECT * FROM Usuario WHERE usuario_id = ?',
           [result.insertId]
         );
         usuario = newUser[0];
+        console.log('Nuevo usuario creado:', JSON.stringify(usuario, null, 2));
       }
 
-      // Generar token JWT
       const token = jwt.sign(
         {
           id: usuario.usuario_id,
@@ -91,15 +105,17 @@ router.get(
         config.jwt.secret,
         { expiresIn: config.jwt.expiresIn }
       );
+      console.log('Token JWT generado:', token);
 
-      console.log('Token generado:', token);
-      // Redirigir al frontend con el token
-      res.redirect(`${FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
+      res.redirect(`${process.env.FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
     } catch (error) {
-      console.error('Error en Google OAuth callback:', error);
-      res.redirect(`${FRONTEND_URL}/home?error=auth_failed`);
+      console.error('Error en Google OAuth callback:', error.message, error.stack);
+      res.redirect(`${process.env.FRONTEND_URL}/home?error=auth_failed`);
     } finally {
-      if (connection) connection.release();
+      if (connection) {
+        connection.release();
+        console.log('Conexión a la base de datos liberada');
+      }
     }
   }
 );
