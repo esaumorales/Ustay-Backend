@@ -33,10 +33,15 @@ router.get(
   async (req, res) => {
     let connection;
     try {
-      console.log('Callback recibido con req.user:', JSON.stringify(req.user, null, 2));
+      console.log(
+        'Callback recibido con req.user:',
+        JSON.stringify(req.user, null, 2)
+      );
       if (!req.user) {
         console.error('No se recibió req.user en el callback de Google');
-        return res.redirect(`${process.env.FRONTEND_URL}/home?error=auth_failed`);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/home?error=auth_failed`
+        );
       }
 
       console.log('Datos de req.user:', {
@@ -44,7 +49,7 @@ router.get(
         google_id: req.user.google_id,
         nombre: req.user.nombre,
         apellido_pa: req.user.apellido_pa,
-        apellido_ma: req.user.apellido_ma
+        apellido_ma: req.user.apellido_ma,
       });
 
       connection = await pool.getConnection();
@@ -54,7 +59,10 @@ router.get(
         'SELECT * FROM Usuario WHERE correo_electronico = ?',
         [req.user.correo_electronico]
       );
-      console.log('Resultado de la consulta de usuario:', JSON.stringify(existingUsers, null, 2));
+      console.log(
+        'Resultado de la consulta de usuario:',
+        JSON.stringify(existingUsers, null, 2)
+      );
 
       let usuario;
 
@@ -68,7 +76,7 @@ router.get(
           apellido_pa: req.user.apellido_pa,
           apellido_ma: req.user.apellido_ma,
           correo_electronico: req.user.correo_electronico,
-          google_id: req.user.google_id
+          google_id: req.user.google_id,
         });
 
         const [result] = await connection.query(
@@ -84,7 +92,7 @@ router.get(
             req.user.apellido_ma || '',
             req.user.correo_electronico,
             newUUID,
-            req.user.google_id
+            req.user.google_id,
           ]
         );
 
@@ -107,9 +115,15 @@ router.get(
       );
       console.log('Token JWT generado:', token);
 
-      res.redirect(`${process.env.FRONTEND_URL}/home?token=${encodeURIComponent(token)}`);
+      res.redirect(
+        `${process.env.FRONTEND_URL}/home?token=${encodeURIComponent(token)}`
+      );
     } catch (error) {
-      console.error('Error en Google OAuth callback:', error.message, error.stack);
+      console.error(
+        'Error en Google OAuth callback:',
+        error.message,
+        error.stack
+      );
       res.redirect(`${process.env.FRONTEND_URL}/home?error=auth_failed`);
     } finally {
       if (connection) {
@@ -336,6 +350,7 @@ router.post('/change-password', async (req, res) => {
 router.post('/register', async (req, res) => {
   let connection;
   try {
+    console.log('Solicitud recibida en /register:', req.body);
     const {
       nombre,
       apellido_pa,
@@ -352,53 +367,56 @@ router.post('/register', async (req, res) => {
       !contrasena ||
       !rol_id
     ) {
+      console.log('Faltan campos requeridos:', {
+        nombre,
+        apellido_pa,
+        correo_electronico,
+        contrasena,
+        rol_id,
+      });
       return res
         .status(400)
         .json({ message: 'Todos los campos son requeridos' });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(correo_electronico)) {
-      return res
-        .status(400)
-        .json({ message: 'Formato de correo electrónico inválido' });
-    }
-
+    console.log('Validación de campos exitosa');
     connection = await pool.getConnection();
+    console.log('Conexión a la base de datos establecida');
 
     const [existingUser] = await connection.query(
       'SELECT * FROM Usuario WHERE correo_electronico = ?',
       [correo_electronico]
     );
+    console.log('Consulta de usuario existente:', existingUser);
 
     if (existingUser.length > 0) {
+      console.log('Usuario ya existe:', existingUser);
       return res
         .status(400)
         .json({ message: 'El correo electrónico ya está registrado' });
     }
 
-    // Eliminar registros temporales previos para evitar duplicados
     await connection.query(
       'DELETE FROM RegistroTemporal WHERE correo_electronico = ?',
       [correo_electronico]
     );
+    console.log('Registros temporales eliminados');
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(contrasena, salt);
+    console.log('Contraseña hasheada exitosamente');
 
-    // Generar código de 6 dígitos
     const codigo_verificacion = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-
     const expiracion = new Date();
     expiracion.setHours(expiracion.getHours() + 1);
     const expiracionFormatted = formatDateToMySQL(expiracion);
 
     await connection.query(
       `INSERT INTO RegistroTemporal (
-        rol_id, nombre, apellido_pa, apellido_ma, 
-        correo_electronico, contrasena, 
+        rol_id, nombre, apellido_pa, apellido_ma,
+        correo_electronico, contrasena,
         codigo_verificacion, expiracion_codigo
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -412,6 +430,7 @@ router.post('/register', async (req, res) => {
         expiracionFormatted,
       ]
     );
+    console.log('Registro temporal insertado');
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -420,6 +439,7 @@ router.post('/register', async (req, res) => {
         pass: EMAIL_PASS,
       },
     });
+    console.log('Transporte de correo configurado');
 
     const mailOptions = {
       from: `"Soporte USTAY" <${EMAIL_USER}>`,
@@ -459,19 +479,22 @@ router.post('/register', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Correo enviado exitosamente');
 
     res.status(200).json({
       message: 'Código de verificación enviado al correo electrónico',
       correo_electronico,
     });
   } catch (error) {
-    console.error('Error en registro:', error);
+    console.error('Error en registro:', error.message, error.stack);
     res.status(500).json({
       message: 'Error al iniciar registro',
       error: error.message,
+      stack: error.stack,
     });
   } finally {
     if (connection) connection.release();
+    console.log('Conexión liberada');
   }
 });
 
