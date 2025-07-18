@@ -386,7 +386,7 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(contrasena, salt);
 
-    // CAMBIADO: Generar código de 6 dígitos
+    // Generar código de 6 dígitos
     const codigo_verificacion = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
@@ -413,7 +413,7 @@ router.post('/register', async (req, res) => {
       ]
     );
 
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: EMAIL_USER,
@@ -422,13 +422,39 @@ router.post('/register', async (req, res) => {
     });
 
     const mailOptions = {
-      from: EMAIL_USER,
+      from: `"Soporte USTAY" <${EMAIL_USER}>`,
       to: correo_electronico,
-      subject: 'Verifica tu cuenta',
+      subject: 'Verificación de su cuenta - USTAY',
       html: `
-        <h1>Bienvenido a nuestra plataforma</h1>
-        <p>Tu código de verificación es: <strong>${codigo_verificacion}</strong></p>
-        <p>Este código expirará en 1 hora.</p>
+        <div style="font-family: Arial, sans-serif; background-color: #f7f7f7; padding: 20px; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 5px; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #1a1a1a; font-size: 24px;">Bienvenido a USTAY</h1>
+            </div>
+            <p style="font-size: 16px; line-height: 1.5;">
+              Estimado/a <strong>${nombre} ${apellido_pa}</strong>,
+            </p>
+            <p style="font-size: 16px; line-height: 1.5;">
+              Gracias por registrarse en nuestra plataforma. Para completar el proceso de verificación de su cuenta, le solicitamos utilizar el siguiente código de verificación:
+            </p>
+            <div style="text-align: center; margin: 20px 0;">
+              <span style="display: inline-block; background-color: #1a1a1a; color: #ffffff; font-size: 20px; font-weight: bold; padding: 10px 20px; border-radius: 5px;">
+                ${codigo_verificacion}
+              </span>
+            </div>
+            <p style="font-size: 14px; line-height: 1.5; color: #666;">
+              Este código tiene una validez de 1 hora. Por favor, ingréselo en la plataforma dentro de ese período. Si no solicitó este registro, le recomendamos ignorar este mensaje o contactar a nuestro soporte.
+            </p>
+            <p style="font-size: 14px; line-height: 1.5; color: #666; margin-top: 20px;">
+              Atentamente,<br />
+              <strong>Equipo de Soporte de USTAY</strong><br />
+              <a href="mailto:${EMAIL_USER}" style="color: #1a1a1a; text-decoration: none;">${EMAIL_USER}</a>
+            </p>
+            <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
+              © ${new Date().getFullYear()} USTAY. Todos los derechos reservados.
+            </div>
+          </div>
+        </div>
       `,
     };
 
