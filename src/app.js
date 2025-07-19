@@ -22,20 +22,30 @@ const puntosRoutes = require('./modules/puntos/rutas');
 const app = express();
 
 // Middlewares
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173/', 
-    credentials: true // Permitir cookies/sesiones
-  }));
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  app.use(session({
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // Permitir cookies/sesiones
+  })
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  session({
     secret: process.env.SESSION_SECRET || 'your_secret_key', // Usar variable de entorno
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' } // Cookies seguras en producción
-  }));
-  app.use(passport.initialize());
-  app.use(passport.session());
+    cookie: { secure: process.env.NODE_ENV === 'production' }, // Cookies seguras en producción
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Rutas de la app
 app.use('/', userRoutes);
