@@ -419,98 +419,142 @@ router.put('/:id', verifyToken, async (req, res) => {
       disponibilidad,
       informacion_adicional,
       periodo_id,
-      fotos, // Las fotos se pasan desde el frontend
+      fotos,            // Las fotos se pasan desde el frontend
+      servicios,        // Nuevo: servicios seleccionados
+      serviceDetails    // Nuevo: detalles de cada servicio
     } = req.body;
 
     const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    // Primero, obtener los datos actuales del cuarto
-    const [cuartoActual] = await connection.query(
-      'SELECT * FROM Cuarto WHERE cuarto_id = ?',
-      [req.params.id]
-    );
-
-    if (cuartoActual.length === 0) {
-      connection.release();
-      return res.status(404).json({ message: 'Cuarto no encontrado' });
-    }
-
-    // Obtener los valores actuales del cuarto
-    const cuarto = cuartoActual[0];
-
-    // Prepara el objeto para   ctualización
-    const updatedFields = {};
-
-    // Solo actualizamos los campos que se pasaron en la solicitud
-    updatedFields.tipo_cuarto_id = tipo_cuarto_id || cuarto.tipo_cuarto_id;
-    updatedFields.precio = precio || cuarto.precio;
-    updatedFields.nombre = nombre || cuarto.nombre;
-    updatedFields.dimensiones = dimensiones || cuarto.dimensiones;
-    updatedFields.n_piso = n_piso || cuarto.n_piso;
-    updatedFields.n_cuarto = n_cuarto || cuarto.n_cuarto;
-    updatedFields.descripcion = descripcion || cuarto.descripcion;
-    updatedFields.disponibilidad =
-      disponibilidad !== undefined ? disponibilidad : cuarto.disponibilidad;
-    updatedFields.informacion_adicional =
-      informacion_adicional || cuarto.informacion_adicional;
-    updatedFields.periodo_id = periodo_id || cuarto.periodo_id;
-
-    // Actualización de los datos del cuarto
-    const setClause = Object.keys(updatedFields)
-      .map((key) => `${key} = ?`)
-      .join(', ');
-    const values = [...Object.values(updatedFields), req.params.id];
-    await connection.query(
-      `UPDATE Cuarto SET ${setClause} WHERE cuarto_id = ?`,
-      values
-    );
-
-    // Si se pasan nuevas fotos, gestionarlas
-    if (fotos && fotos.length > 0) {
-      // Eliminar fotos anteriores de la tabla Foto
-      await connection.query('DELETE FROM Foto WHERE cuarto_id = ?', [
-        req.params.id,
-      ]);
-
-      // Subir nuevas fotos a Cloudinary
-      const newImageUrls = await Promise.all(fotos.map(uploadToCloudinary));
-
-      // Insertar nuevas fotos en la tabla Foto
-      const fotoValues = newImageUrls.map((url) => [req.params.id, url]);
-      await connection.query(
-        'INSERT INTO Foto (cuarto_id, url_imagen) VALUES ?',
-        [fotoValues]
+    try {
+      // Primero, obtener los datos actuales del cuarto
+      const [cuartoActual] = await connection.query(
+        'SELECT * FROM Cuarto WHERE cuarto_id = ?',
+        [req.params.id]
       );
+
+      if (cuartoActual.length === 0) {
+        connection.release();
+        return res.status(404).json({ message: 'Cuarto no encontrado' });
+      }
+
+      const cuarto = cuartoActual[0];
+
+      const updatedFields = {
+        tipo_cuarto_id: tipo_cuarto_id || cuarto.tipo_cuarto_id,
+        precio: precio || cuarto.precio,
+        nombre: nombre || cuarto.nombre,
+        dimensiones: dimensiones || cuarto.dimensiones,
+        n_piso: n_piso || cuarto.n_piso,
+        n_cuarto: n_cuarto || cuarto.n_cuarto,
+        descripcion: descripcion || cuarto.descripcion,
+        disponibilidad: disponibilidad !== undefined ? disponibilidad : cuarto.disponibilidad,
+        informacion_adicional: informacion_adicional || cuarto.informacion_adicional,
+        periodo_id: periodo_id || cuarto.periodo_id
+      };
+
+      const setClause = Object.keys(updatedFields)
+        .map((key) => `${key} = ?`)
+        .join(', ');
+      const values = [...Object.values(updatedFields), req.params.id];
+
+      await connection.query(
+        `UPDATE Cuarto SET ${setClause} WHERE cuarto_id = ?`,
+        values
+      );
+
+      /** ---- ACTUALIZAR SERVICIOS ---- */
+      if (servicios && Array.isArray(servicios) && serviceDetails) {
+        // Borrar servicios previos
+        await connection.query(
+          'DELETE FROM Servicio_x_Cuarto WHERE cuarto_id = ?',
+          [req.params.id]
+        );
+
+        const servicioMap = {
+          luz: 1,
+          agua: 2,
+          wifi: 3,
+          seguridad: 4,
+          calefaccion: 5,
+          limpieza: 6,
+          garage: 7
+        };
+
+        const servicioValues = servicios
+          .map((servicio) => {
+            const servicio_id = servicioMap[servicio];
+            const descripcion = serviceDetails[servicio] || 'Sin descripción';
+            if (!servicio_id) return null;
+            return [servicio_id, req.params.id, descripcion];
+          })
+          .filter((v) => v !== null);
+
+        if (servicioValues.length > 0) {
+          await connection.query(
+            'INSERT INTO Servicio_x_Cuarto (servicio_id, cuarto_id, descripcion) VALUES ?',
+            [servicioValues]
+          );
+        }
+      }
+
+      /** ---- ACTUALIZAR FOTOS ---- */
+      if (fotos && fotos.length > 0) {
+        await connection.query('DELETE FROM Foto WHERE cuarto_id = ?', [
+          req.params.id
+        ]);
+
+        const newImageUrls = await Promise.all(fotos.map(uploadToCloudinary));
+
+        const fotoValues = newImageUrls.map((url) => [req.params.id, url]);
+        await connection.query(
+          'INSERT INTO Foto (cuarto_id, url_imagen) VALUES ?',
+          [fotoValues]
+        );
+      }
+
+      await connection.commit();
+      connection.release();
+
+      res.json({ message: 'Cuarto actualizado exitosamente' });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      console.error('Error al actualizar cuarto:', error);
+      res.status(500).json({ message: 'Error al actualizar cuarto', error: error.message });
     }
-
-    connection.release();
-
-    res.json({ message: 'Cuarto actualizado exitosamente' });
   } catch (error) {
-    console.error('Error al actualizar cuarto:', error);
-    res
-      .status(500)
-      .json({ message: 'Error al actualizar cuarto', error: error.message });
+    console.error('Error en la actualización del cuarto:', error);
+    res.status(500).json({ message: 'Error al actualizar cuarto', error: error.message });
   }
 });
 
+
 // Eliminar cuarto
 router.delete('/:id', verifyToken, async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
-    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    // Eliminar las fotos asociadas al cuarto
+    // Eliminar las fotos asociadas al cuarto en Cloudinary
     const [fotos] = await connection.query(
-      'SELECT * FROM Foto WHERE cuarto_id = ?',
+      'SELECT url_imagen FROM Foto WHERE cuarto_id = ?',
       [req.params.id]
     );
+
     for (const foto of fotos) {
-      await deleteImageByUrl(foto.url_imagen); // Eliminar imagen de Cloudinary
+      try {
+        await deleteImageByUrl(foto.url_imagen);
+      } catch (err) {
+        console.error(`Error eliminando imagen ${foto.url_imagen} en Cloudinary:`, err.message);
+      }
     }
 
     // Eliminar las fotos de la base de datos
     await connection.query('DELETE FROM Foto WHERE cuarto_id = ?', [
-      req.params.id,
+      req.params.id
     ]);
 
     // Eliminar las asociaciones de servicios (Servicio_x_Cuarto)
@@ -521,16 +565,18 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
     // Eliminar el cuarto de la base de datos
     await connection.query('DELETE FROM Cuarto WHERE cuarto_id = ?', [
-      req.params.id,
+      req.params.id
     ]);
 
-    connection.release();
-
+    await connection.commit();
     res.json({ message: 'Cuarto eliminado exitosamente' });
+
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Error al eliminar cuarto', error: error.message });
+    await connection.rollback();
+    console.error('Error al eliminar cuarto:', error);
+    res.status(500).json({ message: 'Error al eliminar cuarto', error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
