@@ -22,18 +22,12 @@ const puntosRoutes = require('./modules/puntos/rutas');
 const app = express();
 
 // Middlewares
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true, // Permitir cookies/sesiones
-  })
-);
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+      ? process.env.FRONTEND_URL
+      : 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
