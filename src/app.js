@@ -23,7 +23,7 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-    origin: process.env.FRONTEND_URL, 
+    origin: process.env.FRONTEND_URL || 'http://192.168.100.51:5173/', 
     credentials: true // Permitir cookies/sesiones
   }));
   app.use(express.json());
