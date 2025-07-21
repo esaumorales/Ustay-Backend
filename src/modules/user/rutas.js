@@ -33,9 +33,10 @@ router.get(
   async (req, res) => {
     let connection;
     try {
-      console.log('🔵 Callback de Google alcanzado');
+      console.log('🔵 Entró al callback de Google');
       console.log('req.user:', req.user);
       console.log('req.session:', req.session);
+      console.log('req.isAuthenticated:', req.isAuthenticated ? req.isAuthenticated() : 'no disponible');
 
       if (!req.user) {
         console.error('No se recibió req.user en el callback de Google');
