@@ -650,7 +650,7 @@ router.get('/perfil', verifyToken, async (req, res) => {
   try {
     connection = await pool.getConnection();
     const [users] = await connection.query(
-      `SELECT usuario_id, rol_id, nombre, apellido_pa, apellido_ma, correo_electronico, fecha_registro 
+      `SELECT usuario_id, rol_id, nombre, apellido_pa, apellido_ma, correo_electronico, fecha_registro, foto_google
        FROM Usuario 
        WHERE usuario_id = ?`,
       [req.user.id]
